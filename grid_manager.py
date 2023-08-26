@@ -107,7 +107,7 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
                 grid.cubes.append(cube)
                 if len(grid.all_columns['column'+str(column_counter)]) == num_z:
                     column_counter = column_counter+1
-                xz_surface_index = column_counter % num_z
+                xz_surface_index = column_counter % num_y
                 xy_surface_index = len(grid.all_columns['column'+str(column_counter)])
                 grid.surfaces_xy['surface_xy'+str(xy_surface_index)].append(cube)
                 grid.surfaces_xz['surface_xz'+str(xz_surface_index)].append(cube)
@@ -121,9 +121,9 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
 
 
 # Parameters
-num_x = 7 # Number of cubes in the x-direction
-num_y = 12 # Number of cubes in the y-direction
-num_z = 3  # Number of cubes in the z-direction
+num_x = 4 # Number of cubes in the x-direction
+num_y = 6 # Number of cubes in the y-direction
+num_z = 5  # Number of cubes in the z-direction
 cube_size = 8.0  # Size of each cube
 grid = create_grid(num_x,num_y,num_z,cube_size=cube_size)
 
