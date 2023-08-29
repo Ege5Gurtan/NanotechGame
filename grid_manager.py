@@ -3,10 +3,11 @@ import copy
 
 
 class Grid():
-    def __init__(self,num_x,num_y,num_z):
+    def __init__(self,num_x,num_y,num_z,cube_size=1):
         self.num_x = num_x
         self.num_y = num_y
         self.num_z = num_z
+        self.cube_size = cube_size
         self.grid_num_columns = num_x*num_y
         self.grid_num_yz_surface = num_x
         self.grid_num_xy_surface = num_z
@@ -78,8 +79,11 @@ class Grid():
                 return self.surfaces_xz[surface_xz_name]
     
     def select_cube(self,cube_index):
-        self.cubes[cube_index].select_set(True)
-        return self.cubes[cube_index]
+        if not(cube_index == None):
+            self.cubes[cube_index].select_set(True)
+            return self.cubes[cube_index]
+        else:
+            return None
     
     def select_grid_corners(self):
         grid_corners = []
@@ -100,20 +104,63 @@ class Grid():
 class Grid_Cube:
     def __init__(self,grid,cube_index):
         self.grid = grid
+        self.cube_size = grid.cube_size
         self.total_cube_number = grid.num_x*grid.num_y*grid.num_z
         self.cube_index = cube_index
-        
-        
         self.neighbour_z_cube_index = cube_index+1
         self.neighbour_minus_z_cube_index = cube_index-1
         self.neighbour_x_cube_index = cube_index + grid.num_z*grid.num_y 
         self.neighbour_minus_x_cube_index = cube_index - grid.num_z*grid.num_y
         self.neighbour_y_cube_index = cube_index + grid.num_z
         self.neighbour_minus_y_cube_index = cube_index - grid.num_z
-    
-    def verify_neighbour_exist():
-        pass
-        #checks if neighbour of the Grid_Cube is within the grid boundaries
+        
+        self.verify_neighbour_existance()
+        
+        self.neighbour_z_cube = grid.select_cube(self.neighbour_z_cube_index)
+        self.neighbour_minus_z_cube = grid.select_cube(self.neighbour_minus_z_cube_index)
+        
+        self.neighbour_x_cube = grid.select_cube(self.neighbour_x_cube_index)
+        self.neighbour_minus_x_cube = grid.select_cube(self.neighbour_minus_x_cube_index)
+        
+        self.neighbour_y_cube = grid.select_cube(self.neighbour_y_cube_index)
+        self.neighbour_minus_y_cube = grid.select_cube(self.neighbour_minus_y_cube_index)
+        
+        bpy.ops.object.select_all(action='DESELECT')
+        
+    def verify_neighbour_existance(self):
+        cube = self.grid.select_cube(self.cube_index)
+        cube_center_point = self.get_cube_center_point(cube)
+        
+        neighbour_z_center = tuple(map(sum,zip(cube_center_point,(0,0,self.cube_size))))
+        neighbour_minus_z_center = tuple(map(sum,zip(cube_center_point,(0,0,-self.cube_size))))
+        
+        neighbour_y_center = tuple(map(sum,zip(cube_center_point,(0,self.cube_size,0))))
+        neighbour_minus_y_center = tuple(map(sum,zip(cube_center_point,(0,-self.cube_size,0))))
+        
+        neighbour_x_center = tuple(map(sum,zip(cube_center_point,(self.cube_size,0,0))))
+        neighbour_minus_x_center = tuple(map(sum,zip(cube_center_point,(-self.cube_size,0,0))))
+        
+        neighbour_z_existance = self.is_point_inside_grid(neighbour_z_center,self.grid)
+        neighbour_minus_z_existance = self.is_point_inside_grid(neighbour_minus_z_center,self.grid)
+        
+        neighbour_y_existance = self.is_point_inside_grid(neighbour_y_center,self.grid)
+        neighbour_minus_y_existance = self.is_point_inside_grid(neighbour_minus_y_center,self.grid)
+        
+        neighbour_x_existance = self.is_point_inside_grid(neighbour_x_center,self.grid)
+        neighbour_minus_x_existance = self.is_point_inside_grid(neighbour_minus_x_center,self.grid)
+        
+        if not(neighbour_z_existance):
+            self.neighbour_z_cube_index = None
+        if not(neighbour_minus_z_existance):
+            self.neighbour_minus_z_cube_index = None
+        if not(neighbour_y_existance):
+            self.neighbour_y_cube_index = None
+        if not(neighbour_minus_y_existance):
+            self.neighbour_minus_y_cube_index = None
+        if not(neighbour_x_existance):
+            self.neighbour_x_cube_index = None
+        if not(neighbour_minus_x_existance):
+            self.neighbour_minus_x_cube_index = None
     
     def select_cube(self,itself=True,
     z=False,_z=False,
@@ -136,17 +183,27 @@ class Grid_Cube:
             selected_cubes['_x']=self.grid.select_cube(self.neighbour_minus_x_cube_index)    
         return selected_cubes
     
+    
     @staticmethod
-    def is_inside_grid(test_cube,grid):
-        edge_cubes = grid.select_grid_corners()
-        corner_points = []
+    def get_cube_center_point(test_cube):
         test_center_v = test_cube.matrix_world @ test_cube.location
         test_point = (test_center_v.x,test_center_v.y,test_center_v.z)
+        return test_point
+    
+    @staticmethod
+    def is_cube_inside_grid(test_cube,grid):
+        test_point = self.get_cube_center_point(test_cube)
+        is_inside = self.is_point_inside_grid(test_point,grid)
+        return is_inside
         
+    @staticmethod
+    def is_point_inside_grid(test_point,grid):
+        edge_cubes = grid.select_grid_corners()
+        corner_points = []
         for obj in edge_cubes:
             center_coordinates = obj.matrix_world @ obj.location
             corner_points.append((center_coordinates.x,center_coordinates.y,center_coordinates.z))
-
+        
         min_x, min_y, min_z = map(min, zip(*corner_points))
         max_x, max_y, max_z = map(max, zip(*corner_points))
         x, y, z = test_point
@@ -155,6 +212,21 @@ class Grid_Cube:
             return True
         else:
             return False
+    
+    @staticmethod
+    def print_neighbour_indices(cube):
+        print('+z : ' + str(cube.neighbour_z_cube_index))
+        print('-z : ' + str(cube.neighbour_minus_z_cube_index))
+        print('+x : ' + str(cube.neighbour_x_cube_index))
+        print('-x : ' + str(cube.neighbour_minus_x_cube_index))
+        print('+y : ' + str(cube.neighbour_y_cube_index))
+        print('-y : ' + str(cube.neighbour_minus_y_cube_index))
+    
+        
+        
+
+        
+        
      
     
 def create_grid(num_x,num_y,num_z,cube_size=1):
@@ -170,7 +242,7 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
     bpy.ops.object.delete()
     
     # Create cubes in a grid
-    grid = Grid(num_x,num_y,num_z)
+    grid = Grid(num_x,num_y,num_z,cube_size=cube_size)
     column_counter = 0
     yz_surface_counter = -1
     for i in range(num_x):
@@ -195,30 +267,13 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
 
 
 
-def is_inside_prism(point, prism_corners):
-    min_x, min_y, min_z = map(min, zip(*prism_corners))
-    max_x, max_y, max_z = map(max, zip(*prism_corners))
-    x, y, z = point
-
-    if min_x <= x <= max_x and min_y <= y <= max_y and min_z <= z <= max_z:
-        return True
-    else:
-        return False
-
-
 # Parameters
-num_x = 5 # Number of cubes in the x-direction
-num_y = 5 # Number of cubes in the y-direction
-num_z = 5  # Number of cubes in the z-direction
+num_x = 7 # Number of cubes in the x-direction
+num_y = 8 # Number of cubes in the y-direction
+num_z = 15  # Number of cubes in the z-direction
 cube_size = 8.0  # Size of each cube
 grid = create_grid(num_x,num_y,num_z,cube_size=cube_size)
-
-
-
-location = (40.0, 30.0, 10.0)  # Replace with your desired coordinates
-bpy.ops.mesh.primitive_cube_add(size=10, enter_editmode=False, location=location)
-test_cube = bpy.context.active_object
-result = Grid_Cube.is_inside_grid(test_cube,grid)
-print(result)
-
+cube = Grid_Cube(grid,32)
+selected_cubes = cube.select_cube(z=True,_z=True,x=True,_x=True,y=True,_y=True,itself=False)
+print(selected_cubes)
 
