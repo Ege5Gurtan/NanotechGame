@@ -13,14 +13,54 @@ gm = include_module('grid_manager.py')
 mm = include_module('material_manager.py')
 
 
-grid = gm.create_grid(5,5,5)
+grid = gm.create_grid(5,5,5,cube_size=10)
 selected_surface = grid.select_surface_xy(0)
 test_material = mm.create_material('test',1,0,0,0)
 
+test_material2 = mm.create_material('test2',0,1,0,0)
 #print(test_material)
-for cube in selected_surface:
-    print(cube)
+#for cube in selected_surface:
+#    print(cube)
 
 #print(cube)
 #for cube in selected_surface:
 #    mm.assign_material(cube,test_material)
+
+cube = grid.select_cube(0)
+mm.assign_material(cube,test_material2)
+
+def check_if_cube_has_material(cube):
+    if hasattr(cube,"data") and hasattr(cube.data,"materials") and (len(cube.data.materials) > 0):
+        return True
+    else:
+        return False
+
+
+thickness=3
+for column_index in range(0,grid.grid_num_columns):
+    column = grid.select_column(column_index)
+    number_of_deposited_cubes = 0
+    for cube in column:
+        cube_index = grid.cube_indices[cube]
+        grid_cube = gm.Grid_Cube(grid,cube_index)
+        
+        if number_of_deposited_cubes < thickness:
+            
+            deposit = False
+            
+            #check if minus z neighbour of the cube has material assigned
+            bottom_has_material = check_if_cube_has_material(grid_cube.neighbour_minus_z_cube)
+            
+            #check if the cube has already a material assigned
+            itself_has_material = check_if_cube_has_material(cube)
+            
+            if bottom_has_material and not(itself_has_material):
+                deposit = True
+            elif grid_cube.neighbour_minus_z_cube == None and not(itself_has_material):
+                deposit = True
+            
+            if deposit:
+                mm.assign_material(cube,test_material)
+                number_of_deposited_cubes +=1
+                
+        
