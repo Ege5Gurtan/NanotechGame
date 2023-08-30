@@ -17,6 +17,7 @@ class Grid():
         self.surfaces_xy = self.construct_xy_surface_scheme()
         self.surfaces_xz = self.construct_xz_surface_scheme()
         self.cubes = []
+        self.cube_indices = {}
         
     def construct_all_columns_scheme(self):
         all_columns = {}
@@ -85,7 +86,12 @@ class Grid():
         else:
             return None
     
+    
     def select_grid_corners(self):
+        num_x = self.num_x
+        num_y = self.num_y
+        num_z = self.num_z
+        
         grid_corners = []
         grid_corners.append(self.select_cube(0))
         grid_corners.append(self.select_cube(num_z-1))
@@ -98,7 +104,8 @@ class Grid():
         
         return grid_corners
         
-        
+    def get_cube_index(self,cube):
+        pass        
         
 
 class Grid_Cube:
@@ -244,6 +251,7 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
     # Create cubes in a grid
     grid = Grid(num_x,num_y,num_z,cube_size=cube_size)
     column_counter = 0
+    cube_counter = 0
     yz_surface_counter = -1
     for i in range(num_x):
         yz_surface_counter = yz_surface_counter + 1
@@ -252,6 +260,8 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
                 bpy.ops.mesh.primitive_cube_add(size=cube_size, enter_editmode=False, location=(i * cube_size, j * cube_size, k * cube_size))
                 cube = bpy.context.active_object
                 grid.cubes.append(cube)
+                grid.cube_indices[cube] = cube_counter
+                cube_counter = cube_counter +1
                 if len(grid.all_columns['column'+str(column_counter)]) == num_z:
                     column_counter = column_counter+1
                 xz_surface_index = column_counter % num_y
@@ -268,12 +278,15 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
 
 
 # Parameters
-num_x = 7 # Number of cubes in the x-direction
-num_y = 8 # Number of cubes in the y-direction
-num_z = 15  # Number of cubes in the z-direction
-cube_size = 8.0  # Size of each cube
-grid = create_grid(num_x,num_y,num_z,cube_size=cube_size)
-cube = Grid_Cube(grid,32)
-selected_cubes = cube.select_cube(z=True,_z=True,x=True,_x=True,y=True,_y=True,itself=False)
-print(selected_cubes)
+#num_x = 4 # Number of cubes in the x-direction
+#num_y = 5 # Number of cubes in the y-direction
+#num_z = 6  # Number of cubes in the z-direction
+#cube_size = 8.0  # Size of each cube
+#grid = create_grid(num_x,num_y,num_z,cube_size=cube_size)
+##cube = Grid_Cube(grid,32)
+#selected_cubes = cube.select_cube(z=True,_z=True,x=True,_x=True,y=True,_y=True,itself=False)
+#print(selected_cubes)
+#cube = grid.select_cube(2)
+#print(grid.cube_indices[cube])
+
 
