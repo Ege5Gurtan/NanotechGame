@@ -1,6 +1,13 @@
 import bpy
 import copy
+import importlib
+def include_module(module_path):
+    spec = importlib.util.spec_from_file_location("my_module", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
+mm = include_module('material_manager.py')
 
 class Grid():
     def __init__(self,num_x,num_y,num_z,cube_size=1):
@@ -18,7 +25,11 @@ class Grid():
         self.surfaces_xz = self.construct_xz_surface_scheme()
         self.cubes = []
         self.cube_indices = {}
+        self.cube_history = {}
+        self.grid_cubes = []
+        self.empty_material = mm.create_material('empty',0,0,0,0)
         
+    
     def construct_all_columns_scheme(self):
         all_columns = {}
         for i in range(0,self.grid_num_columns):
@@ -105,7 +116,15 @@ class Grid():
         return grid_corners
         
     def get_cube_index(self,cube):
-        pass        
+        pass
+
+    def hide_empty_cubes(self):
+        for cube in self.cubes:
+            if len(cube.data.materials) == 0:
+                cube.hide_viewport = True
+                cube.hide_render = True
+                
+        
         
 
 class Grid_Cube:
@@ -230,11 +249,8 @@ class Grid_Cube:
         print('-y : ' + str(cube.neighbour_minus_y_cube_index))
     
         
+       
         
-
-        
-        
-     
     
 def create_grid(num_x,num_y,num_z,cube_size=1):
     # Parameters
@@ -259,8 +275,10 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
             for k in range(num_z):
                 bpy.ops.mesh.primitive_cube_add(size=cube_size, enter_editmode=False, location=(i * cube_size, j * cube_size, k * cube_size))
                 cube = bpy.context.active_object
+                #mm.assign_material(cube,grid.empty_material)
                 grid.cubes.append(cube)
                 grid.cube_indices[cube] = cube_counter
+                grid.cube_history[cube] = ['empty']
                 cube_counter = cube_counter +1
                 if len(grid.all_columns['column'+str(column_counter)]) == num_z:
                     column_counter = column_counter+1
@@ -275,7 +293,9 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
     bpy.context.view_layer.update()
     return grid
 
-
+def get_layer_difference(layer_1_cubes,layer_2_cubes):
+    difference = list(set(layer_1_cubes) - set(layer_2_cubes))
+    return difference
 
 # Parameters
 #num_x = 4 # Number of cubes in the x-direction
