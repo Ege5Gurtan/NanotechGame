@@ -1,0 +1,12 @@
+Process,Thickness,Material,Pattern,Resist_Type
+Deposit,1,Si,,
+Deposit,2,SiO2,,
+Deposit,1,Nitride,,
+Deposit,1,resist,,positive
+Expose,,resist,somefile,
+Develop,,,,
+Etch,,Nitride,,
+Etch,,SiO2,,
+Etch,,resist,,
+Deposit,5,Au,,
+Polish,,Au,,
