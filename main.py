@@ -6,13 +6,15 @@ import pandas as pd
 import os
 import numpy as np
 
-input_csv = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\example_inputs_1\stack_description.csv"
+input_csv = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\dual_damascene_example\stack_description.csv"
 
-animate = False
+animate = True
 animation_starting_frame = 30
 num_frames_per_operation = 10
 frame_extension = 150
 
+## optional: material.csv
+material_csv = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\dual_damascene_example\material.csv"
 
 for material in bpy.data.materials:
     bpy.data.materials.remove(material)
@@ -44,16 +46,30 @@ class Grid_Properties:
         self.cube_size = 10
 
 class Materials:
-    def __init__(self):
+    def __init__(self,use_material_df=False,df=''):
         self.material_dict = {
          'Si': mm.create_material('Si',0.5,0.5,0.5,1),
          'SiO2': mm.create_material('SiO2',1,0,0,1),
          'resist': mm.create_material('resist',0,1,0,1),
-         'exposed': mm.create_material('exposed',0,0,1,1),
+         'exposed': mm.create_material('exposed',1,0.014,0.998,1),
          'Nitride': mm.create_material('Nitride',0,0,0,1),
+         'Cu':  mm.create_material('Cu',1,0.5,0.5,1),
          'Au':mm.create_material('Au',1,1,0,1),
+         'ILD':mm.create_material('ILD',0.2,0.2,1,1),
+         'IMD':mm.create_material('IMD',0,0,0.6,1),
         }
-
+        if use_material_df:
+            for i in range(len(df)):
+                material_name = df.loc[i, "Material"]
+                for material in bpy.data.materials:
+                    if material_name == material.name:
+                        bpy.data.materials.remove(material)
+                r =  float(df.loc[i, "R"])
+                g = float(df.loc[i, "G"])
+                b = float(df.loc[i, "B"])
+                a = float(df.loc[i, "A"])
+                self.material_dict[material_name] = mm.create_material(material_name,r,g,b,a)
+                
 
 class Deposit:
     def __init__(self,thickness,material_name,grid):
@@ -87,6 +103,12 @@ def check_pattern_files(df):
     height = max(recorded_heights)
     return width,height
 
+def is_number(string_value):
+    try:
+        number = float(string_value)
+        return np.isfinite(number)
+    except ValueError:
+        return False
 
 grid_props = Grid_Properties()
 pattern_files = df['Pattern'].dropna()
@@ -98,7 +120,12 @@ estimated_grid_size_z = int(df['Thickness'].sum())
 
 
 grid = gm.create_grid(width,height,estimated_grid_size_z,cube_size=grid_props.cube_size)
-materials = Materials()
+
+if os.path.exists(material_csv):
+    material_df = pd.read_csv(material_csv)
+    materials = Materials(use_material_df=True,df=material_df)
+else:
+    materials = Materials()
 
 
 class Deposition():
@@ -135,6 +162,9 @@ for i in range(len(df)):
     
     if '%' in process:
         continue
+    
+    if '#' in process:
+        break
 
     if material_name in list(materials.material_dict.keys()):
         material_object = materials.material_dict[material_name]
@@ -144,6 +174,7 @@ for i in range(len(df)):
     if process == 'Deposit':
         deposited_cubes = pm.Deposit(int(thickness),grid,material_object)
         deposition  = Deposition(deposited_cubes,material_object)
+        
         if isinstance(resist_type,str):
             deposition.resist_type = resist_type
         operations.append(deposition)        
@@ -173,9 +204,13 @@ for i in range(len(df)):
         operations.append(development)
 
     if process == 'Etch':
-        etched_cubes = pm.Etch([material_name],grid)
+        if is_number(thickness):
+            etched_cubes = pm.Etch([material_name],grid,etch_depth=int(thickness))
+        else:
+            etched_cubes = pm.Etch([material_name],grid)
         etching = Etching(etched_cubes)
         operations.append(etching)
+        
         
     if process == 'Polish':
         polished_cubes = pm.Polish(material_name,grid)
