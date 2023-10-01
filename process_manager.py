@@ -12,6 +12,7 @@ import psutil
 import time
 import keyboard
 from functools import partial
+import numpy as np
 
 
 def include_module(module_path):
@@ -77,6 +78,34 @@ def on_tile_click(event,scatter=[],ax=[],fig=[],all_patches=[]):
     ax.patches[ind[0]].set_facecolor('green')
     fig.canvas.draw()
     clicked_tiles.append(ind)
+
+
+def Expose_Pattern_v2(resist_layer_cubes,grid,material_to_expose,pattern_df):
+    exposed_indices = []
+    counter = 0
+    for column in pattern_df:
+        for index, value in enumerate(pattern_df[column]):
+            if not(isinstance(value,float) and (np.isnan(value))):
+                if not(value=='end'):
+                    exposed_indices.append(counter)
+            counter = counter +1
+
+    exposed_cubes = []
+    for i in exposed_indices:
+        exposed_cube = resist_layer_cubes[i]
+        exposed_cubes.append(exposed_cube)
+        mm.assign_material(exposed_cube,material_to_expose,grid,add_to_history=False)
+        
+    for cube in grid.cubes:
+        if cube in exposed_cubes:
+            grid.cube_history[cube].append(material_to_expose)
+        else:
+            grid.cube_history[cube].append(grid.cube_history[cube][-1])
+            
+    return exposed_cubes
+    
+    
+    
 
 def Expose_Pattern(resist_layer_cubes,grid,material_to_expose):
     exposed_cubes = []
@@ -175,28 +204,30 @@ def Remove_Cube_Material_Content(cubes,grid):
         
 
 
-def Etch(materials_to_etch,grid):
+def Etch(materials_to_etch,grid,etch_depth=100000000000):
     etched_cubes = []
     #materials_to_etch = ['nitride','SIO2']
     #Etch(materials_to_etch,grid)
     for column in grid.all_columns:
         column_cubes = grid.all_columns[column]
+        etched_cube_amount = 0
         for cube in column_cubes[::-1]:
             grid.cube_history[cube].append(grid.cube_history[cube][-1])
             cube_index = grid.cube_indices[cube]
             grid_cube = gm.Grid_Cube(grid,cube_index)
             ##if cube itself has material to be etched and it above neighbour is empty
-            top_neighbour_cube = grid_cube.neighbour_z_cube 
+            top_neighbour_cube = grid_cube.neighbour_z_cube
             if not(top_neighbour_cube==None):
                 top_has_material = mm.check_if_cube_has_material(top_neighbour_cube)
                 cube_has_material =  mm.check_if_cube_has_material(cube)
                 name = mm.get_material_name(cube)
-                if not(top_has_material) and cube_has_material:
+                if not(top_has_material) and cube_has_material and etched_cube_amount<etch_depth:
                     for material_name in materials_to_etch:
                         if material_name in name:                            
                             cube.data.materials.clear()
                             etched_cubes.append(cube)
                             grid.cube_history[cube][-1] = 'empty'
+                            etched_cube_amount = etched_cube_amount + 1
 
                             
     
@@ -213,9 +244,10 @@ def Polish(material_to_polish,grid):
             material =  mm.get_material_name(cube)
             found_materials.append(material)
         
-        #import pdb;pdb.set_trace();
+        
         found_materials_without_none = [item for item in found_materials if item is not None]
         layer_to_remove = all(material_to_polish in item for item in found_materials_without_none)
+        #import pdb;pdb.set_trace();
         if layer_to_remove:
             for cube in surface_cubes:
                 cube.data.materials.clear()

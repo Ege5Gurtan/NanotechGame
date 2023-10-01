@@ -3,8 +3,10 @@ import importlib.util
 import subprocess
 import sys
 import pandas as pd
+import os
+import numpy as np
 
-input_csv = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\stack_description.csv"
+input_csv = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\example_inputs_1\stack_description.csv"
 
 animate = False
 animation_starting_frame = 30
@@ -35,6 +37,11 @@ mm = include_module('material_manager.py')
 pm = include_module('process_manager.py')
 am = include_module('animation_manager.py')
 
+class Grid_Properties:
+    def __init__(self):
+        self.default_grid_size_x = 5
+        self.default_grid_size_y = 5
+        self.cube_size = 10
 
 class Materials:
     def __init__(self):
@@ -57,14 +64,40 @@ class Deposit:
 
 
 df = pd.read_csv(input_csv)
-estimated_grid_size_x = 5
-estimated_grid_size_y = 5
+df = df[~df['Process'].str.contains('%')]
 
+def check_pattern_files(df):
+    recorded_heights = []
+    recorded_widths = []
+    recorded_pattern_files = []
+    
+    pattern_files = df['Pattern'].dropna()
+    for pattern_file in pattern_files:
+            if os.path.exists(pattern_file):
+                pattern_file = pd.read_csv(pattern_file)
+                height = len(pattern_file)
+                width = len(pattern_file.columns)
+                recorded_heights.append(height)
+                recorded_widths.append(width)
+                recorded_pattern_files.append(pattern_file)
+            else:
+                print('WARNING! Following pattern file does not exist: ',pattern_file)
+    
+    width = max(recorded_widths)
+    height = max(recorded_heights)
+    return width,height
+
+
+grid_props = Grid_Properties()
+pattern_files = df['Pattern'].dropna()
+if len(pattern_files) == 0:
+    width, height = grid_props.default_grid_size_x,grid_props.default_grid_size_y
+else: 
+    width, height = check_pattern_files(df)
 estimated_grid_size_z = int(df['Thickness'].sum())
 
-cube_size = 10
 
-grid = gm.create_grid(estimated_grid_size_x,estimated_grid_size_y,estimated_grid_size_z,cube_size=cube_size)
+grid = gm.create_grid(width,height,estimated_grid_size_z,cube_size=grid_props.cube_size)
 materials = Materials()
 
 
@@ -98,6 +131,7 @@ for i in range(len(df)):
     thickness = df.loc[i, "Thickness"]
     material_name =  df.loc[i, "Material"]
     resist_type = df.loc[i,'Resist_Type']
+    pattern_file = df.loc[i,'Pattern']
     
     if '%' in process:
         continue
@@ -117,7 +151,15 @@ for i in range(len(df)):
     if process == 'Expose':
         last_operation = operations[-1]
         cubes_to_expose = last_operation.cubes
-        exposed_cubes = pm.Expose_Pattern(cubes_to_expose,grid,materials.material_dict['exposed'])
+        if os.path.exists(pattern_file):
+            pattern_df = pd.read_csv(pattern_file)
+            if not(len(pattern_df) == height): ### make heights of dfs equal if there is mismatch
+                difference = abs(len(pattern_df)-height)
+                for _ in range(difference):
+                    pattern_df.loc[pattern_df.shape[0]] = [np.nan]*df.shape[1]
+            exposed_cubes = pm.Expose_Pattern_v2(cubes_to_expose,grid,materials.material_dict['exposed'],pattern_df)
+        else:
+            exposed_cubes = pm.Expose_Pattern(cubes_to_expose,grid,materials.material_dict['exposed'])
         exposure = Exposure(exposed_cubes,materials.material_dict['exposed'])
         operations.append(exposure)
         
