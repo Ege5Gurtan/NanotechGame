@@ -92,7 +92,7 @@ class Grid():
     
     def select_cube(self,cube_index):
         if not(cube_index == None):
-            self.cubes[cube_index].select_set(True)
+            #self.cubes[cube_index].select_set(True)
             return self.cubes[cube_index]
         else:
             return None
@@ -123,7 +123,24 @@ class Grid():
             if len(cube.data.materials) == 0:
                 cube.hide_viewport = True
                 cube.hide_render = True
+    
+    def show_non_empty_cubes(self):
+        for cube in self.cubes:
+            if len(cube.data.materials) > 0:
+                cube.hide_viewport = False
+                cube.hide_render = False
+        
                 
+    def delete_empty_cubes(self):
+        #bpy.ops.object.select_all(action='DESELECT')
+        for cube in self.cubes:
+            if len(cube.data.materials) == 0:
+                cube.select_set(True)
+        bpy.ops.object.delete()
+        
+                
+
+
         
         
 
@@ -131,7 +148,7 @@ class Grid_Cube:
     def __init__(self,grid,cube_index):
         self.grid = grid
         self.cube_size = grid.cube_size
-        self.total_cube_number = grid.num_x*grid.num_y*grid.num_z
+        #self.total_cube_number = grid.num_x*grid.num_y*grid.num_z
         self.cube_index = cube_index
         self.neighbour_z_cube_index = cube_index+1
         self.neighbour_minus_z_cube_index = cube_index-1
@@ -141,6 +158,7 @@ class Grid_Cube:
         self.neighbour_minus_y_cube_index = cube_index - grid.num_z
         
         self.verify_neighbour_existance()
+        
         
         self.neighbour_z_cube = grid.select_cube(self.neighbour_z_cube_index)
         self.neighbour_minus_z_cube = grid.select_cube(self.neighbour_minus_z_cube_index)
@@ -152,41 +170,33 @@ class Grid_Cube:
         self.neighbour_minus_y_cube = grid.select_cube(self.neighbour_minus_y_cube_index)
         
         bpy.ops.object.select_all(action='DESELECT')
+            
         
     def verify_neighbour_existance(self):
-        cube = self.grid.select_cube(self.cube_index)
-        cube_center_point = self.get_cube_center_point(cube)
+        grid_size_y = self.grid.num_y
+        grid_size_x = self.grid.num_x
+        grid_size_z = self.grid.num_z
+        cube = self.grid.cubes[self.cube_index]
         
-        neighbour_z_center = tuple(map(sum,zip(cube_center_point,(0,0,self.cube_size))))
-        neighbour_minus_z_center = tuple(map(sum,zip(cube_center_point,(0,0,-self.cube_size))))
-        
-        neighbour_y_center = tuple(map(sum,zip(cube_center_point,(0,self.cube_size,0))))
-        neighbour_minus_y_center = tuple(map(sum,zip(cube_center_point,(0,-self.cube_size,0))))
-        
-        neighbour_x_center = tuple(map(sum,zip(cube_center_point,(self.cube_size,0,0))))
-        neighbour_minus_x_center = tuple(map(sum,zip(cube_center_point,(-self.cube_size,0,0))))
-        
-        neighbour_z_existance = self.is_point_inside_grid(neighbour_z_center,self.grid)
-        neighbour_minus_z_existance = self.is_point_inside_grid(neighbour_minus_z_center,self.grid)
-        
-        neighbour_y_existance = self.is_point_inside_grid(neighbour_y_center,self.grid)
-        neighbour_minus_y_existance = self.is_point_inside_grid(neighbour_minus_y_center,self.grid)
-        
-        neighbour_x_existance = self.is_point_inside_grid(neighbour_x_center,self.grid)
-        neighbour_minus_x_existance = self.is_point_inside_grid(neighbour_minus_x_center,self.grid)
-        
-        if not(neighbour_z_existance):
+        if cube in self.grid.surfaces_xy['surface_xy'+str(grid_size_z-1)]:
             self.neighbour_z_cube_index = None
-        if not(neighbour_minus_z_existance):
+        
+        if cube in self.grid.surfaces_xy['surface_xy0']:
             self.neighbour_minus_z_cube_index = None
-        if not(neighbour_y_existance):
+            
+            
+        if cube in self.grid.surfaces_xz['surface_xz'+str(grid_size_y-1)]:
             self.neighbour_y_cube_index = None
-        if not(neighbour_minus_y_existance):
+        
+        if cube in self.grid.surfaces_xz['surface_xz0']:
             self.neighbour_minus_y_cube_index = None
-        if not(neighbour_x_existance):
+            
+        if cube in self.grid.surfaces_yz['surface_yz'+str(grid_size_x-1)]:
             self.neighbour_x_cube_index = None
-        if not(neighbour_minus_x_existance):
+        
+        if cube in self.grid.surfaces_yz['surface_yz0']:
             self.neighbour_minus_x_cube_index = None
+        
     
     def select_cube(self,itself=True,
     z=False,_z=False,

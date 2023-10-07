@@ -32,22 +32,22 @@ def Deposit(thickness,grid,material):
         number_of_deposited_cubes = 0
         for cube in column:
             grid.cube_history[cube].append(grid.cube_history[cube][-1])
-            cube_index = grid.cube_indices[cube]
-            grid_cube = gm.Grid_Cube(grid,cube_index)
-            
             if number_of_deposited_cubes < thickness:
-                
                 deposit = False
+                cube_index = grid.cube_indices[cube]
+                bottom_neighbour_index = cube_index-1
                 
-                #check if minus z neighbour of the cube has material assigned
-                bottom_has_material = mm.check_if_cube_has_material(grid_cube.neighbour_minus_z_cube)
+                if cube in grid.surfaces_xy['surface_xy0']:
+                    bottom_neighbour_index = None
                 
+                bottom_neighbour_cube = grid.select_cube(bottom_neighbour_index)
+                bottom_has_material = mm.check_if_cube_has_material(bottom_neighbour_cube)
                 #check if the cube has already a material assigned
                 itself_has_material = mm.check_if_cube_has_material(cube)
                 
                 if bottom_has_material and not(itself_has_material):
                     deposit = True
-                elif grid_cube.neighbour_minus_z_cube == None and not(itself_has_material):
+                elif bottom_neighbour_cube == None and not(itself_has_material):
                     deposit = True
                 
                 if deposit:
@@ -55,10 +55,9 @@ def Deposit(thickness,grid,material):
                     number_of_deposited_cubes +=1
                     deposited_cubes.append(cube)
                     grid.cube_history[cube][-1] = material
+            #else:
+            #    break
                     
-    
-                    
-    
     return deposited_cubes
 
 clicked_tiles = []
@@ -89,6 +88,8 @@ def Expose_Pattern_v2(resist_layer_cubes,grid,material_to_expose,pattern_df):
                 if not(value=='end'):
                     exposed_indices.append(counter)
             counter = counter +1
+            
+    #grid.cube_history[cube].append(grid.cube_history[cube][-1])
 
     exposed_cubes = []
     for i in exposed_indices:
@@ -97,11 +98,12 @@ def Expose_Pattern_v2(resist_layer_cubes,grid,material_to_expose,pattern_df):
         mm.assign_material(exposed_cube,material_to_expose,grid,add_to_history=False)
         
     for cube in grid.cubes:
+        
         if cube in exposed_cubes:
             grid.cube_history[cube].append(material_to_expose)
         else:
             grid.cube_history[cube].append(grid.cube_history[cube][-1])
-            
+    #import pdb;pdb.set_trace();    
     return exposed_cubes
     
     
@@ -206,6 +208,7 @@ def Remove_Cube_Material_Content(cubes,grid):
 
 def Etch(materials_to_etch,grid,etch_depth=100000000000):
     etched_cubes = []
+    grid_size_z = grid.num_z
     #materials_to_etch = ['nitride','SIO2']
     #Etch(materials_to_etch,grid)
     for column in grid.all_columns:
@@ -214,11 +217,15 @@ def Etch(materials_to_etch,grid,etch_depth=100000000000):
         for cube in column_cubes[::-1]:
             grid.cube_history[cube].append(grid.cube_history[cube][-1])
             cube_index = grid.cube_indices[cube]
-            grid_cube = gm.Grid_Cube(grid,cube_index)
-            ##if cube itself has material to be etched and it above neighbour is empty
-            top_neighbour_cube = grid_cube.neighbour_z_cube
-            if not(top_neighbour_cube==None):
-                top_has_material = mm.check_if_cube_has_material(top_neighbour_cube)
+
+            ##if cube itself has material to be etched and it above neighbour is empty            
+            neighbour_z_cube_index = cube_index+1
+            if cube in grid.surfaces_xy['surface_xy'+str(grid_size_z-1)]:
+                neighbour_z_cube_index = None
+            neighbour_z_cube = grid.select_cube(neighbour_z_cube_index)
+            
+            if not(neighbour_z_cube==None):
+                top_has_material = mm.check_if_cube_has_material(neighbour_z_cube)
                 cube_has_material =  mm.check_if_cube_has_material(cube)
                 name = mm.get_material_name(cube)
                 if not(top_has_material) and cube_has_material and etched_cube_amount<etch_depth:

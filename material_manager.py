@@ -20,6 +20,8 @@ def create_material(material_name,R,G,B,A):
     return new_material
 
 def assign_material(obj,material_to_be_assigned,grid,add_to_history=True):
+    #import pdb;pdb.set_trace();
+    #if len(obj.data.materials)>0:
     obj.data.materials.clear()
     obj.data.materials.append(material_to_be_assigned)
     if add_to_history:
