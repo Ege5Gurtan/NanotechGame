@@ -1,0 +1,6 @@
+Material,R,G,B,A
+p_Silicon,1,0,0,1
+SiO2,0.5,0.5,0.5,1
+resist,0,1,0,1
+n_Silicon,0,0,1,1
+Al,0.35,0.35,0.35,1

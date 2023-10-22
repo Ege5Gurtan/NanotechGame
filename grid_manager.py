@@ -9,6 +9,13 @@ def include_module(module_path):
 
 mm = include_module('material_manager.py')
 
+
+class Grid_Properties:
+    def __init__(self):
+        self.default_grid_size_x = 5
+        self.default_grid_size_y = 5
+        self.cube_size = 10
+
 class Grid():
     def __init__(self,num_x,num_y,num_z,cube_size=1):
         self.num_x = num_x
@@ -19,15 +26,26 @@ class Grid():
         self.grid_num_yz_surface = num_x
         self.grid_num_xy_surface = num_z
         self.grid_num_xz_surface = num_y
+        
         self.all_columns = self.construct_all_columns_scheme()
         self.surfaces_yz = self.construct_yz_surface_scheme()
         self.surfaces_xy = self.construct_xy_surface_scheme()
         self.surfaces_xz = self.construct_xz_surface_scheme()
+        
+        self.grid_all_columns = self.construct_all_columns_scheme()
+        self.grid_surfaces_yz = self.construct_yz_surface_scheme()
+        self.grid_surfaces_xy = self.construct_xy_surface_scheme()
+        self.grid_surfaces_xz = self.construct_xz_surface_scheme()
+        
         self.cubes = []
         self.cube_indices = {}
         self.cube_history = {}
+        
         self.grid_cubes = []
-        self.empty_material = mm.create_material('empty',0,0,0,0)
+        self.grid_cube_indices = {}
+        self.grid_cube_history = {}
+
+        
         
     
     def construct_all_columns_scheme(self):
@@ -62,8 +80,21 @@ class Grid():
                     cube.select_set(True)
                     
                 return self.all_columns[column_name]
-            
+        
         print(column_name+' '+'could not be found')
+        
+    def grid_select_column(self,column_index):
+        selected_grid_cubes = []
+        column_name = 'column'+str(column_index)
+        #import pdb;pdb.set_trace();
+        for each_column in self.grid_all_columns:
+            if each_column == column_name:
+                for grid_cube in self.grid_all_columns[column_name]:
+                    selected_grid_cubes.append(grid_cube)
+                
+                return self.grid_all_columns[column_name]
+                
+        
         
     
     def select_surface_yz(self,surface_yz_index):
@@ -92,11 +123,16 @@ class Grid():
     
     def select_cube(self,cube_index):
         if not(cube_index == None):
-            #self.cubes[cube_index].select_set(True)
             return self.cubes[cube_index]
         else:
             return None
     
+    def grid_select_cube(self,cube_index):
+
+        if not(cube_index==None) and cube_index<len(self.grid_cubes):
+            return self.grid_cubes[cube_index]
+        else:
+            return None
     
     def select_grid_corners(self):
         num_x = self.num_x
@@ -259,9 +295,80 @@ class Grid_Cube:
         print('-y : ' + str(cube.neighbour_minus_y_cube_index))
     
         
-       
-        
+class Grid_Element:
+        def __init__(self,cube_name,location,index_x,index_y,index_z):
+            self.cube_name = cube_name
+            self.location = location
+            self.material = None
+            self.index_x = index_x
+            self.index_y = index_y
+            self.index_z = index_z
+            #self.material = material_name
+            
+def create_grid_elements(grid_elements):
+    dummy_cube = grid_elements[0]
+    bpy.ops.mesh.primitive_cube_add(size=10, enter_editmode=False, location=dummy_cube.location)
+    ob = bpy.context.object
     
+    for grid_cube in grid_elements:
+        if not(grid_cube.material == None):
+            copy = ob.copy()
+            copy.data = ob.data.copy()
+            copy.data.materials.append(grid_cube.material)
+            copy.location.x = grid_cube.location[0]
+            copy.location.y = grid_cube.location[1]
+            copy.location.z = grid_cube.location[2]
+            bpy.context.collection.objects.link(copy)
+             
+    bpy.context.view_layer.update()
+
+
+
+    
+
+def create_grid_v2(num_x,num_y,num_z,cube_size=1):
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_by_type(type='MESH')
+    bpy.ops.object.delete()
+    #import pdb;pdb.set_trace();
+    # Create cubes in a grid
+    grid = Grid(num_x,num_y,num_z,cube_size=cube_size)
+    column_counter = 0
+    cube_counter = 0
+    yz_surface_counter = -1
+    for i in range(num_x):
+        yz_surface_counter = yz_surface_counter + 1
+        for j in range(num_y):
+            for k in range(num_z):
+                #bpy.ops.mesh.primitive_cube_add(size=cube_size, enter_editmode=False, location=(i * cube_size, j * cube_size, k * cube_size))
+                
+                #cube = bpy.context.active_object
+                grid_cube = Grid_Element('Cube.'+str(cube_counter),(i * cube_size, j * cube_size, k * cube_size),i,j,k)
+                
+                grid.grid_cubes.append(grid_cube)
+                #grid.cubes.append(cube)
+                
+                grid.grid_cube_indices[grid_cube] = cube_counter
+                #grid.cube_indices[cube] = cube_counter
+                
+                #grid.cube_history[cube] = ['empty']
+                grid.grid_cube_history[grid_cube] = ['empty']
+                
+                cube_counter = cube_counter +1
+                if len(grid.grid_all_columns['column'+str(column_counter)]) == num_z:
+                    column_counter = column_counter+1
+                xz_surface_index = column_counter % num_y
+                xy_surface_index = len(grid.grid_all_columns['column'+str(column_counter)])
+                
+                
+                grid.grid_surfaces_xy['surface_xy'+str(xy_surface_index)].append(grid_cube)
+                grid.grid_surfaces_xz['surface_xz'+str(xz_surface_index)].append(grid_cube)
+                grid.grid_all_columns['column'+str(column_counter)].append(grid_cube)
+                grid.grid_surfaces_yz['surface_yz'+str(yz_surface_counter)].append(grid_cube)
+                
+    return grid
+    
+
 def create_grid(num_x,num_y,num_z,cube_size=1):
     # Parameters
     #num_x = 5  # Number of cubes in the x-direction
@@ -303,6 +410,7 @@ def create_grid(num_x,num_y,num_z,cube_size=1):
     bpy.context.view_layer.update()
     return grid
 
+
 def get_layer_difference(layer_1_cubes,layer_2_cubes):
     difference = list(set(layer_1_cubes) - set(layer_2_cubes))
     return difference
@@ -320,3 +428,20 @@ def get_layer_difference(layer_1_cubes,layer_2_cubes):
 #print(grid.cube_indices[cube])
 
 
+def circular_grid_selector(grid_num_x,grid_num_y,circle_center_index_x,circle_center_index_y,circle_radius):
+    rows = grid_num_x
+    columns = grid_num_y
+    # Define the row and column for the circle's center
+    circle_row = circle_center_index_x  # Fifth row
+    circle_col = circle_center_index_y  # Fourth column
+    circle_radius = circle_radius  # You can adjust the radius as needed
+
+    circle_row = circle_row - 1
+    selected_grids = []
+    for i in range(rows):
+        for j in range(columns):
+            x, y = j + 0.5, rows - i - 0.5
+            if (x - (circle_col -0.5))** 2 + (y - (rows-circle_row-0.5))** 2 <= circle_radius ** 2:
+                selected_grids.append([i+1,j+1])
+    
+    return selected_grids
