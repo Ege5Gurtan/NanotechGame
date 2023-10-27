@@ -20,9 +20,11 @@ pm = include_module('process_manager.py')
 gm = include_module('grid_manager.py')
 sm = include_module('scene_manager.py')
 stm = include_module('stack_manager.py')
+print('clearing the scene')
 sm.clear_scenes()
 sm.clear_materials()
 sm.clear_meshes()
+print('scene has been cleared')
 
 number_of_cores_to_use = 4
 
@@ -45,6 +47,7 @@ def construct_cubes_using_threading(current_grid_columns):
     bpy.data.objects.remove(ob)    
 
 def construct_cubes_using_multiprocessing(current_grid_columns,max_thread_number):
+    print('constructing cubes')
     bpy.ops.mesh.primitive_cube_add(size=10, enter_editmode=False, location=(0,0,0))
     ob = bpy.context.object
     with concurrent.futures.ThreadPoolExecutor(max_thread_number) as executor:
@@ -73,6 +76,7 @@ def construct_scenes_using_multiprocessing(current_grid,name_prefix,process,new_
 
 def build_stack(stack_csv_path,material_csv_path=''):
     df = pd.read_csv(stack_csv_path)
+    df.dropna(how='all',inplace=True)
     if material_csv_path == '':
         material_csv_path = ifm.get_material_file_path(df)
     height,width = ifm.get_grid_xy_dimension_from_patterns(df)
@@ -95,43 +99,12 @@ def build_stack(stack_csv_path,material_csv_path=''):
         
         bpy.context.view_layer.update()            
         bpy.ops.object.select_all(action='DESELECT')
-        
+    
         
 
-if __name__ == '__main__':
-    stack_csv_path = sys.argv[4]
-#stack_csv_path = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\MOSFET\stack_description_mosfet.csv"
-
+stack_csv_path = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\DEMO\stack_description_heitz.csv"
 print('Using the following stack description file')
 print(stack_csv_path)
 
 build_stack(stack_csv_path)
-folder_path = os.path.split(stack_csv_path)[0]
-file_name_with_extension = os.path.split(stack_csv_path)[1]
-filename, ext = os.path.splitext(file_name_with_extension)
-output_file_name_blender = os.path.join(folder_path,filename+'.blend')
-bpy.ops.wm.save_as_mainfile(filepath=output_file_name_blender)
-
-print('stack building is complete!')
-
-
-###########for performance profiling
-#import cProfile
-#import pstats
-#with cProfile.Profile() as profile:
-#    build_stack(stack_csv_path,material_csv_path = material_csv_path)
-
-#scene_to_copy = bpy.data.scenes.get("Scene")
-#new_scene = bpy.data.scenes.new(name='new scene')
-
-#results = pstats.Stats(profile)
-#build_stack(input_csv,material_csv=material_csv,construction_scene=construction_scene,animate=False)
-#results.sort_stats(pstats.SortKey.TIME)
-#results.print_stats(20)
-#print('done')
-
-#build_stack(sys.argv[1])
-
-#output_file_name_blender = 
-#bpy.ops.wm.save_as_mainfile(filepath=file_path)
 

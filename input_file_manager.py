@@ -43,7 +43,7 @@ def get_active_pattern_file_paths(df):
     pattern_files = df[filter_condition]
     return pattern_files
 
-def get_grid_xy_dimension_from_patterns(df):
+def get_grid_xy_dimension_from_patterns(df,default_height=3,default_width=3):
     pattern_files = get_active_pattern_file_paths(df)
     pattern_paths = pattern_files['Path']
     feature_layer_names = pattern_files['Feature_Layer']
@@ -59,6 +59,10 @@ def get_grid_xy_dimension_from_patterns(df):
             height = height - 1
         recorded_heights.append(height)
         recorded_widths.append(width)
+    if recorded_heights == []:
+        recorded_heights = [default_height]
+    if recorded_widths == []:
+        recorded_widths = [default_width]
     return max(recorded_heights),max(recorded_widths)
 
 def get_pattern_dfs(df):
@@ -81,10 +85,6 @@ def reshape_pattern_df(pattern_df,height,width):
             if isinstance(value,str) or (isinstance(value,float) and not(np.isnan(value))):
                 reshaped_pattern_df.at[row_index,int(col_index)] = 'X'
     return reshaped_pattern_df
-
-
-
-
 
 def make_drc_region(output_layout,input_cell,input_layer_index):
     drc_region = pya.Region.new()
@@ -110,6 +110,7 @@ def create_pattern_df_from_oas(input_oasis_path,feature_layer_name,grid_layer_na
     selected_grid_layer= layout.layer(random.randint(100,1000),random.randint(100,1000),'selected')
 
     cell = layout.top_cell()
+    cell.flatten(-1)
     layers = extract_layers_and_indices(layout)
 
     shape_iterator_grid = pya.RecursiveShapeIterator.new(layout, cell, layers[grid_layer_name])
@@ -122,43 +123,67 @@ def create_pattern_df_from_oas(input_oasis_path,feature_layer_name,grid_layer_na
     all_centers = []
     
     
-
+    all_center_x = []
+    all_center_y = []
+    zeroes = []
     while not shape_iterator_grid.at_end():
         shape = shape_iterator_grid.shape()
         center = [shape.dbbox().center().x,shape.dbbox().center().y]
         all_centers.append(center)
+        all_center_x.append(shape.dbbox().center().x)
+        all_center_y.append(shape.dbbox().center().y)
+        zeroes.append(0)
+        
         shape_iterator_grid.next()
 
     interacting_region = grid_region.interacting(feature_region)
     interacting_region.merged_semantics = False
 
+    dbu = layout.dbu
     interacting_region.insert_into(layout, cell.cell_index(),selected_grid_layer)
     shape_iterator_selected_grid = pya.RecursiveShapeIterator.new(layout, cell, selected_grid_layer)
 
+    
     selected_centers = []
+    selected_x = []
+    selected_y = []
+    ones = []
     while not shape_iterator_selected_grid.at_end():
         shape = shape_iterator_selected_grid.shape()
         center = [shape.dbbox().center().x,shape.dbbox().center().y]
+        selected_x.append(shape.dbbox().center().x)
+        selected_y.append(shape.dbbox().center().y)
+        ones.append(1)
         selected_centers.append(center)
         shape_iterator_selected_grid.next()
 
+    df_selected = pd.DataFrame({'x':selected_x,'y':selected_y,'selected':ones})    
+    df_all = pd.DataFrame({'x':all_center_x,'y':all_center_y,'selected':zeroes})    
+    df_merged = df_all.merge(df_selected[['x','y','selected']],on=['x','y'],suffixes=('','_df_selected'),how='left')
+    df_merged['selected'] = df_merged['selected_df_selected'].fillna(df_merged['selected'])
+    df_merged.drop('selected_df_selected',axis=1,inplace=True)
+    df_merged_sorted = df_merged.sort_values(by=['y','x'])
+    df_merged_sorted = df_merged_sorted.reset_index(drop=True)
+    selected_indices_from_df = []
+    for i in df_merged_sorted.index.tolist():
+        is_selected = df_merged_sorted.loc[i, "selected"]
+        if is_selected == 1:
+            selected_indices_from_df.append(i)
+    
+    
+
     x_vals,y_vals = zip(*all_centers)
-    selected_x_vals,selected_y_vals = zip(*selected_centers)
-
-    selected_indices = []
-    for selected_center in selected_centers:
-        selected_indices.append(all_centers.index(selected_center))
-
     col_num = len(set(x_vals))
     row_num = len(set(y_vals))
     pattern_array = np.zeros((row_num,col_num))
     pattern_array = pattern_array.astype('int')
     pattern_array_str = pattern_array.astype('str')
-
-    for selected_index in selected_indices:
+    for selected_index in selected_indices_from_df:
         column_number = selected_index%col_num
         row_number = selected_index//col_num
-        pattern_array_str[row_number][column_number] = 'X'
+        pattern_array_str[row_num-row_number-1][column_number] = 'X'
+    
+    
 
     col_names = [str(i) for i in range(1,col_num+1)]
     df = pd.DataFrame(pattern_array_str,columns=col_names)
@@ -172,14 +197,19 @@ def create_pattern_df_from_oas(input_oasis_path,feature_layer_name,grid_layer_na
     base, _ = os.path.splitext(input_oasis_path)
     output_csv_path =  os.path.join(base,".csv")
     
+    #import pdb;pdb.set_trace();
     
     folder_path = os.path.split(input_oasis_path)[0]
     file_name_with_extension = os.path.split(input_oasis_path)[1]
     filename, ext = os.path.splitext(file_name_with_extension)
     output_csv_path = os.path.join(folder_path,filename+'.csv')
-    #import pdb;pdb.set_trace();
+
     df.to_csv(output_csv_path,index=False)
     pattern_df = pd.read_csv(output_csv_path)
+    
+    output_oas_path_debugging = os.path.join(folder_path,filename+'.debug.oas')
+    layout.write(output_oas_path_debugging)
+    
     os.remove(output_csv_path)
     return pattern_df
 

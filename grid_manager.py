@@ -44,10 +44,29 @@ class Grid():
         self.grid_cubes = []
         self.grid_cube_indices = {}
         self.grid_cube_history = {}
-
-        
-        
     
+    def get_top_surface_cubes_with_material(self):
+        top_surface_cubes = {}
+        for column in self.grid_all_columns:
+            for cube in self.grid_all_columns[column]:
+                if column in list(top_surface_cubes.keys()):
+                    if cube.location[2] > top_surface_cubes[column].location[2] and not(cube.material==None):
+                        top_surface_cubes[column] = cube
+                else:
+                    top_surface_cubes[column] = cube
+        return top_surface_cubes
+                
+
+    def get_top_surface_heights(self):
+        column_lengths = {}
+        for column in self.grid_all_columns:
+            current_column_length_with_material = 0
+            for cube in self.grid_all_columns[column]:
+                if not(cube.material == None):
+                    current_column_length_with_material = current_column_length_with_material + 1
+            column_lengths[column] = current_column_length_with_material
+        return column_lengths
+        
     def construct_all_columns_scheme(self):
         all_columns = {}
         for i in range(0,self.grid_num_columns):
@@ -303,6 +322,7 @@ class Grid_Element:
             self.index_x = index_x
             self.index_y = index_y
             self.index_z = index_z
+            self.is_exposed = False
             #self.material = material_name
             
 def create_grid_elements(grid_elements):
@@ -314,7 +334,11 @@ def create_grid_elements(grid_elements):
         if not(grid_cube.material == None):
             copy = ob.copy()
             copy.data = ob.data.copy()
-            copy.data.materials.append(grid_cube.material)
+            if grid_cube.is_exposed:
+                copy.data.materials.append('exposed')
+                print('it is exposed')
+            else:
+                copy.data.materials.append(grid_cube.material)
             copy.location.x = grid_cube.location[0]
             copy.location.y = grid_cube.location[1]
             copy.location.z = grid_cube.location[2]

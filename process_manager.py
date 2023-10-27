@@ -78,10 +78,27 @@ class Diffusion():
         self.order = order
         self.name = 'Diffuse'
 
+class SpinCoating():
+    def __init__(self,cubes,resist_material,resist_type,order):
+        self.cubes = cubes
+        self.resist_material = resist_material
+        self.order = order
+        self.name = 'SpinCoat'
+        self.resist_type = resist_type
 
 
-
-
+def Grid_SpinCoat(grid,material_name,resist_type,resist_thickness=1):
+    surface_height_map = grid.get_top_surface_heights().values()
+    surface_height_min_level = min(surface_height_map)
+    surface_height_max_level = max(surface_height_map)
+    deposition_amount = surface_height_max_level - surface_height_min_level
+    spin_coated_resist_cubes = Grid_Deposit(deposition_amount,grid,material_name)
+    Grid_Polish(material_name,grid)
+    spin_coated_resist_cubes = spin_coated_resist_cubes + Grid_Deposit(resist_thickness,grid,material_name)
+    
+    
+    return spin_coated_resist_cubes
+    
 def Grid_Deposit(thickness,grid,material_name):
     deposited_cubes = []
     for column_index in range(0,grid.grid_num_columns):
@@ -99,7 +116,6 @@ def Grid_Deposit(thickness,grid,material_name):
                 
                 bottom_neighbour_grid_cube = grid.grid_select_cube(bottom_neighbour_index)
                 
-
                 bottom_grid_cube_has_material = mm.check_if_grid_cube_has_material(bottom_neighbour_grid_cube)
                 grid_cube_itself_has_material = mm.check_if_grid_cube_has_material(grid_cube)
                 
@@ -171,27 +187,58 @@ def on_tile_click(event,scatter=[],ax=[],fig=[],all_patches=[]):
     fig.canvas.draw()
     clicked_tiles.append(ind)
 
-def Grid_Expose_Pattern_v2(resist_layer_cubes,grid,material_to_expose,pattern_df):
+def Grid_Expose_Pattern_v2(grid,material_to_expose,pattern_df):
     exposed_indices = []
     counter = 0
+    grid_size_z = grid.num_z
     for column in pattern_df:
         for index, value in enumerate(pattern_df[column]):
             if not(value == None):
                 exposed_indices.append(counter)
             counter = counter +1
 
+    
     exposed_cubes = []
-    for i in exposed_indices:
-        exposed_cube = resist_layer_cubes[i]
-        exposed_cube.material = material_to_expose
-        exposed_cubes.append(exposed_cube)
+    top_resist_layer_cubes = []
+    
+    top_surface_cubes_dict = grid.get_top_surface_cubes_with_material()
+    top_surface_cubes_to_expose = []
+    for column_name in top_surface_cubes_dict:
+        cube = top_surface_cubes_dict[column_name]
+        if cube.material == material_to_expose:
+            top_surface_cubes_to_expose.append(cube)
+    
+    top_surface_cubes_dict_reversed = {v: k for k, v in top_surface_cubes_dict.items()}
+    
+    
+    exposed_column_names = []
+    if len(top_surface_cubes_to_expose) > 0:
+    
+        for i in exposed_indices:    
+            exposed_cube = top_surface_cubes_to_expose[i]
+            exposed_cube.material = material_to_expose+'_exposed'
+            exposed_cube.is_exposed = True
+            exposed_cubes.append(exposed_cube)
+            column_name = top_surface_cubes_dict_reversed[exposed_cube]
+            exposed_column_names.append(column_name)
         
-    for grid_cube in grid.grid_cubes:
+        for exposed_column_name in exposed_column_names:
+            for cube in grid.grid_all_columns[exposed_column_name]:
+                if cube.material == material_to_expose:
+                    cube.material = material_to_expose+'_exposed'
+                    cube.is_exposed = True
+                    if not(cube in exposed_cubes):
+                        exposed_cubes.append(cube)
         
-        if grid_cube in exposed_cubes:
-            grid.grid_cube_history[grid_cube].append(material_to_expose)
-        else:
-            grid.grid_cube_history[grid_cube].append(grid.grid_cube_history[grid_cube][-1])
+        #import pdb;pdb.set_trace();
+                    
+            
+        for grid_cube in grid.grid_cubes:
+            
+            if grid_cube in exposed_cubes:
+                grid.grid_cube_history[grid_cube].append(grid_cube.material)
+            else:
+                grid.grid_cube_history[grid_cube].append(grid.grid_cube_history[grid_cube][-1])
   
     return exposed_cubes
  
@@ -286,12 +333,14 @@ def Grid_Develop_Pattern(resist_layer_cubes,material_name_to_develop,grid,resist
     print('Resist type is: '+resist_type)
     for grid_cube in resist_layer_cubes:
         if resist_type == 'positive':
-            if not(grid_cube.material == None) and material_name_to_develop in grid.grid_cube_history[grid_cube][-1]:
+            if not(grid_cube.material == None) and (material_name_to_develop+'_exposed' == grid.grid_cube_history[grid_cube][-1]):
                 grid_cube.material = None
+                grid_cube.is_exposed = False
                 developed_cubes.append(grid_cube)
+                
            
         elif resist_type== 'negative':
-            if not(grid_cube.material == None) and not(material_name_to_develop in grid.grid_cube_history[grid_cube][-1]):
+            if not(grid_cube.material == None) and material_name_to_develop==grid_cube.material:
                 grid_cube.material = None
                 developed_cubes.append(grid_cube)
               
@@ -304,6 +353,7 @@ def Grid_Develop_Pattern(resist_layer_cubes,material_name_to_develop,grid,resist
         else:
             grid.grid_cube_history[grid_cube].append(grid.grid_cube_history[grid_cube][-1])
             
+
     return developed_cubes
             
 def Develop_Pattern(resist_layer_cubes,material_name_to_develop,grid,resist_type='positive'):
@@ -359,7 +409,8 @@ def Grid_Etch(materials_to_etch,grid,etch_depth=100000000000):
 
             ##if cube itself has material to be etched and it above neighbour is empty            
             neighbour_z_cube_index = cube_index+1
-            if grid_cube in grid.surfaces_xy['surface_xy'+str(grid_size_z-1)]:
+            
+            if grid_cube in grid.grid_surfaces_xy['surface_xy'+str(grid_size_z-1)]:
                 neighbour_z_cube_index = None
 
             neighbour_z_cube = grid.grid_select_cube(neighbour_z_cube_index)
@@ -367,11 +418,16 @@ def Grid_Etch(materials_to_etch,grid,etch_depth=100000000000):
             top_has_material = mm.check_if_grid_cube_has_material(neighbour_z_cube)
             cube_has_material =  mm.check_if_grid_cube_has_material(grid_cube)
             name = grid_cube.material
+            if not(name==None) and '_exposed' in name:
+                #import pdb;pdb.set_trace();
+                name = name.replace('_exposed',"")
+                #import pdb;pdb.set_trace();
 
             if not(top_has_material) and cube_has_material and etched_cube_amount<etch_depth:
                 for material_name in materials_to_etch:
-                    if material_name in name:  
+                    if material_name in name: #or (material_name in name+'_exposed'):
                         grid_cube.material = None
+                        grid_cube.is_exposed = False
                         etched_cubes.append(grid_cube)
                         grid.grid_cube_history[grid_cube][-1] = 'empty'
                         etched_cube_amount = etched_cube_amount + 1
@@ -395,7 +451,9 @@ def Grid_Polish(material_to_polish,grid):
             for grid_cube in surface_cubes:
                 grid_cube.material = None
                 polished_cubes.append(grid_cube)
-    
+        else:
+            break
+        
     for column in grid.grid_all_columns:
         column_cubes = grid.grid_all_columns[column]
         for grid_cube in column_cubes:
