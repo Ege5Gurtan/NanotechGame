@@ -62,16 +62,16 @@ def construct_active_processes(df,grid,material_csv=''):
             
        elif process == 'Expose':
             last_operation = executed_processes[-1]
-            cubes_to_expose = last_operation.cubes
-            material_name = 'exposed'
+            #cubes_to_expose = last_operation.cubes
+            #material_name = 'exposed'
             file_name, file_extension = os.path.splitext(path)
             if file_extension == '.oas': 
                 pattern_df = ifm.create_pattern_df_from_oas(path,feature_layer_name,grid_layer_name)
             else:
                 pattern_df = pd.read_csv(path)
             pattern_df = ifm.reshape_pattern_df(pattern_df,grid.num_y,grid.num_x)
-            exposed_cubes = pm.Grid_Expose_Pattern_v2(cubes_to_expose,grid,material_name,pattern_df)
-            current_process = pm.Exposure(cubes_to_expose,material_name,process_order)
+            exposed_cubes = pm.Grid_Expose_Pattern_v2(grid,material_name,pattern_df)
+            current_process = pm.Exposure(exposed_cubes,material_name,process_order)
        elif process == 'Develop':
             last_operation = executed_processes[-1] ##exposure
             last_operation_before_exposure = executed_processes[-2] #resist deposition before exposure
@@ -106,6 +106,14 @@ def construct_active_processes(df,grid,material_csv=''):
        elif process == 'Diffuse_y':
             diffused_cubes = pm.Grid_Diffuse_y(material_name,diffusion_medium_material,grid,diffusivity)
             current_process = pm.Diffusion(diffused_cubes,material_name,diffusion_medium_material,process_order)
+       
+       elif process == 'SpinCoat':
+            if ifm.is_number(thickness):
+                spin_coated_cubes = pm.Grid_SpinCoat(grid,material_name,resist_type,resist_thickness=int(thickness))
+            else:
+                spin_coated_cubes = pm.Grid_SpinCoat(grid,material_name,resist_type)
+            current_process = pm.SpinCoating(spin_coated_cubes,material_name,resist_type,process_order)
+            
        
             
        executed_processes.append(current_process)    

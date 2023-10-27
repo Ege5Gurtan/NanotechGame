@@ -52,7 +52,10 @@ def grid_column_to_cubes(reference_cube_object,grid_column):
         if not(grid_cube.material == None):
             copy = reference_cube_object.copy()
             copy.data = reference_cube_object.data.copy()
-            material = mm.get_material_object(grid_cube.material)
+            if grid_cube.is_exposed:
+                material = mm.get_material_object('exposed')
+            else:
+                material = mm.get_material_object(grid_cube.material)
             copy.data.materials.append(material)
             copy.location.x = grid_cube.location[0]
             copy.location.y = grid_cube.location[1]
