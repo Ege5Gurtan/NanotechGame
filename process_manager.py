@@ -1,5 +1,5 @@
 import bpy
-import importlib.util
+import importlib
 import os
 import matplotlib.pyplot as plt
 import matplotlib

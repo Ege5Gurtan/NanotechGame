@@ -13,6 +13,7 @@ def add_optional_column(df,optional_column_name,default_value,column_location=1)
     return df
 
 def get_material_file_path(df):
+
     if not(df[df['Process']=='Material_file'].empty):
         material_file_path = df[df['Process'] == 'Material_file'].iloc[0]['Path']
     else:
@@ -193,7 +194,7 @@ def create_pattern_df_from_oas(input_oasis_path,feature_layer_name,grid_layer_na
         final_row[str(i)] = ''
     final_row['1'] = 'end'
     new_row = pd.Series(final_row)
-    df = df.append(new_row,ignore_index=True)
+    df = df._append(new_row,ignore_index=True)
     base, _ = os.path.splitext(input_oasis_path)
     output_csv_path =  os.path.join(base,".csv")
     
@@ -208,7 +209,7 @@ def create_pattern_df_from_oas(input_oasis_path,feature_layer_name,grid_layer_na
     pattern_df = pd.read_csv(output_csv_path)
     
     output_oas_path_debugging = os.path.join(folder_path,filename+'.debug.oas')
-    layout.write(output_oas_path_debugging)
+    #layout.write(output_oas_path_debugging)
     
     os.remove(output_csv_path)
     return pattern_df
