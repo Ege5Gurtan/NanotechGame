@@ -5,7 +5,16 @@ import threading
 import concurrent.futures
 import os
 import sys
-#os.system('cls')
+import pickle
+
+import nanostack_bpy.scene_manager as sm
+import nanostack_bpy.material_manager as mm
+import nanostack_module.input_file_manager as ifm
+import nanostack_module.grid_manager as gm
+import nanostack_module.stack_manager as stm
+import nanostack_module.process_manager as pm
+
+os.system('cls')
 
 
 
@@ -15,11 +24,8 @@ def include_module(module_path):
     spec.loader.exec_module(module)
     return module
 
-ifm = include_module('input_file_manager.py')
-pm = include_module('process_manager.py')
-gm = include_module('grid_manager.py')
-sm = include_module('scene_manager.py')
-stm = include_module('stack_manager.py')
+
+
 print('clearing the scene')
 sm.clear_scenes()
 sm.clear_materials()
@@ -74,7 +80,7 @@ def construct_scenes_using_multiprocessing(current_grid,name_prefix,process,new_
     
     
 
-def build_stack(stack_csv_path,material_csv_path=''):
+def build_stack(stack_csv_path,material_csv_path='',save_grid_states=False):
     df = pd.read_csv(stack_csv_path)
     df.dropna(how='all',inplace=True)
     if material_csv_path == '':
@@ -85,8 +91,20 @@ def build_stack(stack_csv_path,material_csv_path=''):
 
     grid_props = gm.Grid_Properties()
     grid = gm.create_grid_v2(width,height,estimated_stack_thickness,cube_size=grid_props.cube_size)
-    processes,grid_states = stm.construct_active_processes(df,grid,material_csv=material_csv_path)
     
+    if os.path.exists(material_csv_path):
+        material_df = pd.read_csv(material_csv_path)
+        mm.Materials(use_material_df=True,df=material_df)
+    else:
+        mm.Materials()
+        
+    processes,grid_states = stm.construct_active_processes(df,grid)
+    
+    if save_grid_states:
+        with open('grid_states.pkl','wb') as file:
+            pickle.dump(grid_states,file)
+        
+        
     scene_name_prefixes = sm.generate_array(len(grid_states))
     
     
@@ -106,5 +124,5 @@ stack_csv_path = r"C:\Users\egurtan\Desktop\NEW_TEST\NanotechGame-main\DEMO\stac
 print('Using the following stack description file')
 print(stack_csv_path)
 
-build_stack(stack_csv_path)
+build_stack(stack_csv_path,save_grid_states=True)
 
